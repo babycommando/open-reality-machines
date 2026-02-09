@@ -1,0 +1,1181 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>VR Passthrough HUD + Voice + Vision + Groq</title>
+    <style>
+      :root{
+        --bg:#000;
+        --panel: rgba(14,14,14,.55);
+        --border: rgba(255,255,255,.14);
+        --text: rgba(255,255,255,.92);
+        --muted: rgba(255,255,255,.65);
+        --shadow: rgba(0,0,0,.55);
+      }
+      html,body{
+        height:100%;
+        margin:0;
+        background:var(--bg);
+        overflow:hidden;
+        font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      }
+      .wrap{
+        position:fixed;
+        inset:0;
+        display:grid;
+        grid-template-columns: 1fr 1fr;
+      }
+      .eye{
+        position:relative;
+        overflow:hidden;
+        background:#000;
+      }
+      video{
+        position:absolute;
+        inset:0;
+        width:100%;
+        height:100%;
+        object-fit:cover;
+        transform:scaleX(-1);
+      }
+
+      .flash{
+        position:absolute;
+        inset:0;
+        background:#fff;
+        opacity:0;
+        pointer-events:none;
+      }
+      .flash.on{ animation: flash 0.14s ease-out; }
+      @keyframes flash{
+        0%{opacity:.22}
+        100%{opacity:0}
+      }
+
+      .hud{
+        position:absolute;
+        top:10%;
+        left:7%;
+        width:86%;
+        pointer-events:none;
+        display:flex;
+        flex-direction:column;
+        gap:10px;
+      }
+      .pill{
+        display:inline-flex;
+        align-items:center;
+        gap:10px;
+        padding:10px 12px;
+        border-radius:16px;
+        border:1px solid var(--border);
+        background: var(--panel);
+        box-shadow: 0 10px 30px var(--shadow);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+      }
+      .dot{
+        width:10px;
+        height:10px;
+        border-radius:999px;
+        background:#777;
+        box-shadow: 0 0 0 2px rgba(255,255,255,.10) inset;
+      }
+      .mode{
+        font-weight:800;
+        letter-spacing:.4px;
+        font-size:13px;
+        color:var(--text);
+      }
+      .mini{
+        font-size:12px;
+        color:var(--muted);
+        margin-left:auto;
+        display:flex;
+        align-items:center;
+        gap:10px;
+      }
+      .pulse{
+        width:46px;
+        height:10px;
+        display:inline-flex;
+        align-items:center;
+        justify-content:flex-end;
+        gap:4px;
+        opacity:.9;
+      }
+      .bar{
+        width:6px;
+        height:6px;
+        border-radius:99px;
+        background: rgba(255,255,255,.35);
+        transform-origin: bottom;
+      }
+      .pulse.on .bar{animation: p 0.55s infinite ease-in-out;}
+      .pulse.on .bar:nth-child(2){animation-delay:.08s;}
+      .pulse.on .bar:nth-child(3){animation-delay:.16s;}
+      .pulse.on .bar:nth-child(4){animation-delay:.24s;}
+      @keyframes p{
+        0%{transform:scaleY(.55)}
+        50%{transform:scaleY(1.6)}
+        100%{transform:scaleY(.55)}
+      }
+
+      .card{
+        border:1px solid var(--border);
+        background: rgba(10,10,10,.48);
+        border-radius:18px;
+        padding:12px 12px 14px 12px;
+        box-shadow: 0 10px 30px var(--shadow);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+      }
+      .label{
+        font-size:11px;
+        letter-spacing:.6px;
+        font-weight:900;
+        color: rgba(255,255,255,.55);
+      }
+      .value{
+        margin-top:6px;
+        font-size:15px;
+        line-height:1.22;
+        color:var(--text);
+        word-break:break-word;
+        white-space:pre-wrap;
+      }
+      .value.cmd{
+        white-space:normal;
+        display:-webkit-box;
+        -webkit-line-clamp:4;
+        -webkit-box-orient:vertical;
+        overflow:hidden;
+      }
+      .sub{
+        margin-top:6px;
+        font-size:12px;
+        color:var(--muted);
+        line-height:1.22;
+        white-space:pre-wrap;
+      }
+
+      .aiStage{
+        margin-top:10px;
+        height:58px;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+      }
+      .orb{
+        width:18px;
+        height:18px;
+        border-radius:999px;
+        background: rgba(255,255,255,.65);
+        box-shadow: 0 0 0 2px rgba(255,255,255,.10) inset, 0 10px 24px rgba(0,0,0,.35);
+        animation: breathe 1.4s infinite ease-in-out;
+        opacity:.9;
+      }
+      @keyframes breathe{
+        0%{transform:scale(.92); opacity:.60}
+        50%{transform:scale(1.08); opacity:.95}
+        100%{transform:scale(.92); opacity:.60}
+      }
+
+      .spinner{
+        width:18px;
+        height:18px;
+        border-radius:999px;
+        border:2px solid rgba(255,255,255,.20);
+        border-top-color: rgba(255,255,255,.90);
+        animation: spin 0.9s linear infinite;
+        box-shadow: 0 10px 24px rgba(0,0,0,.35);
+      }
+      @keyframes spin{ to{transform:rotate(360deg)} }
+
+      .wave{
+        display:flex;
+        align-items:flex-end;
+        gap:6px;
+        height:22px;
+      }
+      .wbar{
+        width:6px;
+        height:8px;
+        border-radius:99px;
+        background: rgba(255,255,255,.70);
+        transform-origin: bottom;
+        animation: w 0.45s infinite ease-in-out;
+      }
+      .wbar:nth-child(2){animation-delay:.06s}
+      .wbar:nth-child(3){animation-delay:.12s}
+      .wbar:nth-child(4){animation-delay:.18s}
+      .wbar:nth-child(5){animation-delay:.24s}
+      @keyframes w{
+        0%{transform:scaleY(.45); opacity:.55}
+        50%{transform:scaleY(1.9); opacity:.95}
+        100%{transform:scaleY(.45); opacity:.55}
+      }
+
+      .controls{
+        position:fixed;
+        left:12px;
+        right:12px;
+        bottom:12px;
+        display:flex;
+        gap:8px;
+        z-index:20;
+      }
+      button{
+        flex:1;
+        padding:12px 12px;
+        border-radius:14px;
+        border:1px solid var(--border);
+        background: rgba(20,20,20,.60);
+        color: var(--text);
+        font-weight:800;
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+      }
+      button:active{transform:scale(.985);}
+      .small{flex:.8}
+      .danger{color:#ffd0d0}
+
+      .drawer{
+        position:fixed;
+        inset:0;
+        display:none;
+        z-index:30;
+        background: rgba(0,0,0,.55);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+      }
+      .drawer.on{display:block;}
+      .panel{
+        position:absolute;
+        left:12px;
+        right:12px;
+        bottom:12px;
+        border-radius:18px;
+        border:1px solid var(--border);
+        background: rgba(12,12,12,.78);
+        box-shadow: 0 14px 50px rgba(0,0,0,.70);
+        padding:12px;
+      }
+      .row{display:flex; gap:10px; margin-top:10px;}
+      .field{
+        flex:1;
+        display:flex;
+        flex-direction:column;
+        gap:6px;
+      }
+      .field span{
+        font-size:11px;
+        letter-spacing:.5px;
+        font-weight:900;
+        color: rgba(255,255,255,.55);
+      }
+      input,select{
+        width:100%;
+        padding:10px 10px;
+        border-radius:12px;
+        border:1px solid rgba(255,255,255,.16);
+        background: rgba(0,0,0,.35);
+        color: var(--text);
+        outline:none;
+      }
+      textarea{
+        width:100%;
+        min-height:84px;
+        resize:none;
+        padding:10px 10px;
+        border-radius:12px;
+        border:1px solid rgba(255,255,255,.16);
+        background: rgba(0,0,0,.35);
+        color: var(--text);
+        outline:none;
+        line-height:1.2;
+      }
+      .hint{
+        margin-top:10px;
+        font-size:12px;
+        color: rgba(255,255,255,.70);
+        line-height:1.25;
+      }
+      .hint b{color:var(--text);}
+    </style>
+  </head>
+
+  <body>
+    <div class="wrap">
+      <div class="eye">
+        <video id="vL" playsinline muted></video>
+        <div class="flash" id="flashL"></div>
+        <div class="hud" id="hudL"></div>
+      </div>
+      <div class="eye">
+        <video id="vR" playsinline muted></video>
+        <div class="flash" id="flashR"></div>
+        <div class="hud" id="hudR"></div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button id="startBtn">Start</button>
+      <button id="micBtn" class="small">Mic On</button>
+      <button id="camBtn" class="small">Rear Cam</button>
+      <button id="mirrorBtn" class="small">Mirror On</button>
+      <button id="setBtn" class="small">Settings</button>
+    </div>
+
+    <div class="drawer" id="drawer">
+      <div class="panel">
+        <div class="row">
+          <div class="field">
+            <span>Groq API Key</span>
+            <input id="keyInput" placeholder="gsk_..." autocomplete="off" />
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <span>Wake Word</span>
+            <input id="wakeInput" value="computer" />
+          </div>
+          <div class="field">
+            <span>Speech To Text Language</span>
+            <select id="langSelect">
+              <option value="en-US">en-US</option>
+              <option value="pt-BR">pt-BR</option>
+              <option value="es-ES">es-ES</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <span>Vision Model</span>
+            <input id="modelInput" value="meta-llama/llama-4-maverick-17b-128e-instruct" />
+          </div>
+          <div class="field">
+            <span>Voice Reply</span>
+            <select id="ttsSelect">
+              <option value="on">on</option>
+              <option value="off">off</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <span>TTS Voice</span>
+            <select id="voiceSelect"></select>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <span>System Prompt</span>
+            <textarea id="sysInput"></textarea>
+          </div>
+        </div>
+
+        <div class="row">
+          <button id="saveBtn">Save</button>
+          <button id="closeBtn" class="danger">Close</button>
+        </div>
+
+        <div class="hint">
+          COMMAND is de-duplicated and wake word is stripped.
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const vL = document.getElementById("vL");
+      const vR = document.getElementById("vR");
+      const flashL = document.getElementById("flashL");
+      const flashR = document.getElementById("flashR");
+
+      let stream = null;
+      let facingMode = "environment";
+      let mirrored = true;
+
+      function flash() {
+        flashL.classList.remove("on");
+        flashR.classList.remove("on");
+        void flashL.offsetWidth;
+        void flashR.offsetWidth;
+        flashL.classList.add("on");
+        flashR.classList.add("on");
+      }
+
+      function applyMirror() {
+        const t = mirrored ? "scaleX(-1)" : "scaleX(1)";
+        vL.style.transform = t;
+        vR.style.transform = t;
+        document.getElementById("mirrorBtn").textContent = mirrored ? "Mirror On" : "Mirror Off";
+      }
+
+      async function startCamera() {
+        try {
+          if (stream) stream.getTracks().forEach(t => t.stop());
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode, width: { ideal: 1920 }, height: { ideal: 1080 } },
+            audio: false
+          });
+          vL.srcObject = stream;
+          vR.srcObject = stream;
+          await Promise.all([vL.play(), vR.play()]);
+        } catch (e) {
+          setError("Camera failed: " + (e && e.message ? e.message : e));
+        }
+      }
+
+      async function waitForVideoReady(timeoutMs = 1400) {
+        const t0 = performance.now();
+        while (performance.now() - t0 < timeoutMs) {
+          const w = vL.videoWidth || 0;
+          const h = vL.videoHeight || 0;
+          if (w && h && vL.readyState >= 2) return true;
+          await new Promise(r => setTimeout(r, 60));
+        }
+        return false;
+      }
+
+      const hudL = document.getElementById("hudL");
+      const hudR = document.getElementById("hudR");
+
+      const DEFAULT_SYS =
+        "You are a compact headset assistant, but you have a very acid and dark humour like TARS. Speak like tars but on full comedy. Reply with short, high signal guidance. Keep it readable on a HUD. Make sure the answers are small.";
+
+      const state = {
+        mode: "idle",
+        micOn: true,
+        wakeWord: "computer",
+        lang: "en-US",
+        tts: true,
+        model: "meta-llama/llama-4-maverick-17b-128e-instruct",
+        key: "",
+        systemPrompt: DEFAULT_SYS,
+
+        interim: "",
+        commandDraft: "",
+        sentCommand: "",
+        answer: "",
+        note: "Tap Start",
+
+        visionOk: false,
+        snapAt: 0,
+
+        ttsVoiceId: ""
+      };
+
+      const MODE_META = {
+        idle:      { dot:"#777", label:"IDLE",  pulse:false, note:"Say the wake word" },
+        listening: { dot:"#fff", label:"LISTEN",pulse:true,  note:"Speak your command" },
+        thinking:  { dot:"#bfbfbf", label:"THINK",pulse:true,note:"Vision + Groq" },
+        speaking:  { dot:"#fff", label:"SAY",   pulse:false, note:"Speaking" },
+        error:     { dot:"#ff6b6b", label:"ERR",pulse:false, note:"Fix and retry" }
+      };
+
+      function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, (c) => ({
+          "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+        }[c]));
+      }
+
+      function aiStageHtml() {
+        if (state.mode === "thinking") return `<div class="aiStage"><div class="spinner"></div></div>`;
+        if (state.mode === "speaking") return `<div class="aiStage"><div class="wave"><div class="wbar"></div><div class="wbar"></div><div class="wbar"></div><div class="wbar"></div><div class="wbar"></div></div></div>`;
+        return `<div class="aiStage"><div class="orb"></div></div>`;
+      }
+
+      function renderHUD() {
+        const m = MODE_META[state.mode] || MODE_META.idle;
+        const mic = state.micOn ? "MIC" : "MIC OFF";
+        const hint = state.note || m.note;
+
+        const lineCmd =
+          state.mode === "listening"
+            ? cleanForDisplay((state.commandDraft + " " + state.interim).trim())
+            : cleanForDisplay(state.sentCommand || "");
+
+        let seen = "";
+        if (state.visionOk) seen = (Date.now() - (state.snapAt || 0) < 1200) ? "SNAP" : "V";
+
+        const html = `
+          <div class="pill">
+            <div class="dot" style="background:${m.dot}"></div>
+            <div class="mode">${m.label}</div>
+            <div class="mini">
+              <div>${mic}</div>
+              <div>${seen}</div>
+              <div class="pulse ${m.pulse ? "on" : ""}">
+                <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="label">COMMAND</div>
+            <div class="value cmd">${escapeHtml(lineCmd || "")}</div>
+            <div class="sub">${escapeHtml(hint || "")}</div>
+          </div>
+
+          <div class="card">
+            <div class="label">AI</div>
+            ${aiStageHtml()}
+            <div class="sub">${escapeHtml(state.mode === "thinking" ? "Thinking..." : (state.mode === "speaking" ? "Speaking..." : "Ready"))}</div>
+
+            <!--
+              Keeping for later work:
+              <div class="value">${escapeHtml(state.answer || "")}</div>
+            -->
+          </div>
+        `;
+        hudL.innerHTML = html;
+        hudR.innerHTML = html;
+      }
+
+      function setMode(mode, note) {
+        state.mode = mode;
+        if (note != null) state.note = note;
+        renderHUD();
+      }
+
+      function setError(msg) {
+        state.mode = "error";
+        state.note = msg;
+        renderHUD();
+      }
+
+      function beep(freq = 880, ms = 60, gain = 0.04) {
+        try {
+          const ctx = new (window.AudioContext || window.webkitAudioContext)();
+          const o = ctx.createOscillator();
+          const g = ctx.createGain();
+          o.type = "sine";
+          o.frequency.value = freq;
+          g.gain.value = gain;
+          o.connect(g);
+          g.connect(ctx.destination);
+          o.start();
+          setTimeout(() => { o.stop(); ctx.close(); }, ms);
+        } catch {}
+      }
+
+      function escapeRegExp(s) {
+        return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      }
+
+      function stripAllWake(text, wakeWord) {
+        const w = (wakeWord || "").trim();
+        if (!w) return text;
+        const re = new RegExp("\\b" + escapeRegExp(w) + "\\b", "ig");
+        return String(text || "").replace(re, " ").replace(/\s+/g, " ").trim();
+      }
+
+      function dedupeConsecutiveWords(text) {
+        const words = String(text || "").trim().split(/\s+/).filter(Boolean);
+        const out = [];
+        for (let i = 0; i < words.length; i++) {
+          const w = words[i];
+          const prev = out[out.length - 1];
+          if (prev && prev.toLowerCase() === w.toLowerCase()) continue;
+          out.push(w);
+        }
+        return out.join(" ");
+      }
+
+      function cleanForDisplay(text) {
+        const t = stripAllWake(text, state.wakeWord);
+        return dedupeConsecutiveWords(t).replace(/\s+/g, " ").trim();
+      }
+
+      function wordHit(textLower, wakeWord) {
+        const w = (wakeWord || "").trim().toLowerCase();
+        if (!w) return false;
+        const re = new RegExp("\\b" + escapeRegExp(w) + "\\b", "i");
+        return re.test(textLower);
+      }
+
+      function stripWakeOnce(text, wakeWord) {
+        const w = (wakeWord || "").trim();
+        if (!w) return text;
+        const re = new RegExp("\\b" + escapeRegExp(w) + "\\b[:, ]*", "i");
+        return String(text || "").replace(re, "").trim();
+      }
+
+      /* STT: clean aggregation, no restart loops during TTS */
+      let rec = null;
+      let silenceTimer = null;
+      let listenHardTimer = null;
+
+      let sttIgnore = false;
+      let sttCooldownUntil = 0;
+      let sttSegments = [];
+
+      function supportsSTT() {
+        return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+      }
+
+      function stopSTT() {
+        try { if (rec) rec.stop(); } catch {}
+      }
+
+      function bumpSilence() {
+        if (silenceTimer) clearTimeout(silenceTimer);
+        silenceTimer = setTimeout(() => finalizeCommand(), 850);
+      }
+
+      function bumpListenHardTimeout() {
+        if (listenHardTimer) clearTimeout(listenHardTimer);
+        listenHardTimer = setTimeout(() => finalizeCommand(true), 6500);
+      }
+
+      function enterListening(prefill) {
+        sttSegments = [];
+        state.interim = "";
+        state.commandDraft = "";
+
+        if (prefill) {
+          const cleaned = cleanForDisplay(prefill);
+          if (cleaned) sttSegments.push(cleaned);
+          state.commandDraft = sttSegments.join(" ");
+        }
+
+        setMode("listening", "Listening...");
+        bumpSilence();
+        bumpListenHardTimeout();
+      }
+
+      function addFinalSegment(seg) {
+        const cleaned = cleanForDisplay(seg);
+        if (!cleaned) return;
+
+        const last = sttSegments[sttSegments.length - 1] || "";
+        if (last && last.toLowerCase() === cleaned.toLowerCase()) return;
+
+        sttSegments.push(cleaned);
+        if (sttSegments.length > 10) sttSegments.shift();
+        state.commandDraft = sttSegments.join(" ");
+      }
+
+      function startSTT() {
+        if (!state.micOn) return;
+        if (!supportsSTT()) { setError("Speech recognition unsupported on this browser."); return; }
+
+        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+        if (!rec) {
+          rec = new SR();
+          rec.continuous = true;
+          rec.interimResults = true;
+
+          rec.onresult = (ev) => {
+            if (sttIgnore) return;
+            if (Date.now() < sttCooldownUntil) return;
+
+            let interim = "";
+            const finals = [];
+
+            for (let i = ev.resultIndex; i < ev.results.length; i++) {
+              const r = ev.results[i];
+              const t = (r[0]?.transcript || "").trim();
+              if (!t) continue;
+              if (r.isFinal) finals.push(t);
+              else interim = t;
+            }
+
+            const finalText = finals.join(" ").trim();
+            const hasFinal = !!finalText;
+            const combined = (finalText || interim || "").trim();
+            if (!combined) return;
+
+            if (state.mode === "listening") {
+              if (interim) state.interim = cleanForDisplay(interim);
+              if (finals.length) finals.forEach(addFinalSegment);
+              renderHUD();
+              bumpSilence();
+              bumpListenHardTimeout();
+              return;
+            }
+
+            if (state.mode === "idle") {
+              if (hasFinal && wordHit(finalText.toLowerCase(), state.wakeWord)) {
+                beep(980, 55, 0.05);
+                state.sentCommand = "";
+                state.answer = "";
+                const remainder = stripWakeOnce(finalText, state.wakeWord);
+                enterListening(remainder);
+              }
+            }
+          };
+
+          rec.onerror = (e) => {
+            const code = (e && e.error) ? String(e.error) : "unknown";
+            if (code === "not-allowed" || code === "service-not-allowed") {
+              state.micOn = false;
+              document.getElementById("micBtn").textContent = "Mic Off";
+              stopSTT();
+              setError("Mic permission blocked. Tap Mic On after allowing it.");
+              return;
+            }
+            if (!state.micOn) return;
+            if (sttIgnore) return;
+            setError("Mic error: " + code);
+          };
+
+          rec.onend = () => {
+            if (!state.micOn) return;
+            if (sttIgnore) return;
+            try { rec.start(); } catch {}
+          };
+        }
+
+        rec.lang = state.lang;
+        try { rec.start(); } catch {}
+      }
+
+      /* Vision capture from VR view */
+      const snapCanvas = document.createElement("canvas");
+      const snapCtx = snapCanvas.getContext("2d", { willReadFrequently: false });
+
+      function approxBase64Bytes(dataUrl) {
+        const i = dataUrl.indexOf("base64,");
+        if (i < 0) return 0;
+        const b64 = dataUrl.slice(i + 7);
+        return Math.floor((b64.length * 3) / 4);
+      }
+
+      function captureOnceFromVR(maxDim, quality) {
+        const vw = vL.videoWidth || 0;
+        const vh = vL.videoHeight || 0;
+        if (!vw || !vh) return { dataUrl: null, bytes: 0 };
+
+        const scale = Math.min(1, maxDim / Math.max(vw, vh));
+        const w = Math.max(1, Math.floor(vw * scale));
+        const h = Math.max(1, Math.floor(vh * scale));
+
+        snapCanvas.width = w;
+        snapCanvas.height = h;
+
+        snapCtx.save();
+        snapCtx.clearRect(0, 0, w, h);
+
+        if (mirrored) {
+          snapCtx.translate(w, 0);
+          snapCtx.scale(-1, 1);
+        }
+        snapCtx.drawImage(vL, 0, 0, w, h);
+        snapCtx.restore();
+
+        const dataUrl = snapCanvas.toDataURL("image/jpeg", quality);
+        const bytes = approxBase64Bytes(dataUrl);
+        return { dataUrl, bytes };
+      }
+
+      function captureVisionDataUrl() {
+        let maxDim = 768;
+        let q = 0.72;
+
+        for (let i = 0; i < 5; i++) {
+          const r = captureOnceFromVR(maxDim, q);
+          if (!r.dataUrl) return null;
+          if (r.bytes <= 3700000) return r.dataUrl;
+          maxDim = Math.floor(maxDim * 0.75);
+          q = Math.max(0.45, q - 0.10);
+        }
+        const last = captureOnceFromVR(480, 0.50);
+        return last.dataUrl || null;
+      }
+
+      function modelSupportsVision(modelId) {
+        const m = (modelId || "").toLowerCase();
+        return m.includes("meta-llama/llama-4-");
+      }
+
+      /* History capped at 4 */
+      const history = [];
+      function pushHistory(role, content) {
+        history.push({ role, content });
+        while (history.length > 4) history.shift();
+      }
+
+      /* TTS voices + robust completion */
+      const voiceSelect = document.getElementById("voiceSelect");
+      let ttsVoices = [];
+      let englishVoice = null;
+
+      function voiceId(v) {
+        const uri = v?.voiceURI || "";
+        const name = v?.name || "";
+        const lang = v?.lang || "";
+        return (uri || name) + "|" + lang;
+      }
+
+      function pickEnglishVoice(list) {
+        const voices = list || (window.speechSynthesis.getVoices?.() || []);
+        const prefs = ["en-us", "en-gb", "en"];
+        for (const p of prefs) {
+          const v = voices.find(x => (x.lang || "").toLowerCase().startsWith(p));
+          if (v) return v;
+        }
+        return voices.find(x => (x.lang || "").toLowerCase().startsWith("en")) || null;
+      }
+
+      function sortVoices(list) {
+        const a = Array.from(list || []);
+        a.sort((x, y) => {
+          const xl = (x.lang || "").toLowerCase();
+          const yl = (y.lang || "").toLowerCase();
+          const xe = xl.startsWith("en") ? 0 : 1;
+          const ye = yl.startsWith("en") ? 0 : 1;
+          if (xe !== ye) return xe - ye;
+          if (xl !== yl) return xl.localeCompare(yl);
+          return (x.name || "").localeCompare(y.name || "");
+        });
+        return a;
+      }
+
+      function refreshVoices() {
+        try { ttsVoices = window.speechSynthesis.getVoices?.() || []; }
+        catch { ttsVoices = []; }
+        englishVoice = pickEnglishVoice(ttsVoices);
+
+        if (!voiceSelect) return;
+        voiceSelect.innerHTML = "";
+
+        const autoOpt = document.createElement("option");
+        autoOpt.value = "";
+        autoOpt.textContent = "Auto (English first)";
+        voiceSelect.appendChild(autoOpt);
+
+        for (const v of sortVoices(ttsVoices)) {
+          const o = document.createElement("option");
+          o.value = voiceId(v);
+          const d = v.default ? " [default]" : "";
+          o.textContent = `${v.name} (${v.lang})${d}`;
+          voiceSelect.appendChild(o);
+        }
+
+        const want = state.ttsVoiceId || "";
+        const exists = Array.from(voiceSelect.options).some(o => o.value === want);
+        voiceSelect.value = exists ? want : "";
+      }
+
+      function warmupVoices() {
+        try { window.speechSynthesis.getVoices?.(); } catch {}
+        setTimeout(refreshVoices, 120);
+        setTimeout(refreshVoices, 500);
+        setTimeout(refreshVoices, 1200);
+      }
+
+      function getSelectedVoice() {
+        if (!state.ttsVoiceId) return null;
+        const id = state.ttsVoiceId;
+        return ttsVoices.find(v => voiceId(v) === id) || null;
+      }
+
+      function initTTS() {
+        try { window.speechSynthesis.onvoiceschanged = () => refreshVoices(); } catch {}
+        warmupVoices();
+      }
+
+      let ttsWatch = null;
+
+      function endTTSFlow(note) {
+        if (ttsWatch) { clearInterval(ttsWatch); ttsWatch = null; }
+        sttIgnore = false;
+        sttCooldownUntil = Date.now() + 650;
+        setMode("idle", note || ("Say: " + state.wakeWord));
+      }
+
+      function startTTSWatchdog(maxMs = 45000) {
+        if (ttsWatch) clearInterval(ttsWatch);
+        const synth = window.speechSynthesis;
+        const t0 = Date.now();
+
+        ttsWatch = setInterval(() => {
+          const active = !!(synth && (synth.speaking || synth.pending));
+          if (!active) {
+            clearInterval(ttsWatch);
+            ttsWatch = null;
+            if (state.mode === "speaking") endTTSFlow();
+            return;
+          }
+
+          if (Date.now() - t0 > maxMs) {
+            try { synth.cancel(); } catch {}
+            clearInterval(ttsWatch);
+            ttsWatch = null;
+            endTTSFlow("Ready");
+          }
+        }, 250);
+      }
+
+      function speak(text) {
+        if (!state.tts) { endTTSFlow(); return; }
+
+        const synth = window.speechSynthesis;
+        if (!synth) { endTTSFlow(); return; }
+
+        try {
+          sttIgnore = true;
+          sttCooldownUntil = Date.now() + 650;
+
+          try { synth.cancel(); } catch {}
+          try { if (synth.paused) synth.resume(); } catch {}
+
+          const chosen = getSelectedVoice();
+          const u = new SpeechSynthesisUtterance(text);
+
+          u.voice = chosen || englishVoice || pickEnglishVoice(ttsVoices) || null;
+          u.lang = (u.voice && u.voice.lang) ? u.voice.lang : "en-US";
+          u.rate = 1.05;
+          u.pitch = 1.0;
+
+          u.onstart = () => setMode("speaking", "Speaking...");
+          u.onend = () => endTTSFlow();
+          u.onerror = () => endTTSFlow("Ready");
+
+          setMode("speaking", "Speaking...");
+          synth.speak(u);
+
+          try { if (synth.paused) synth.resume(); } catch {}
+          startTTSWatchdog();
+        } catch {
+          endTTSFlow("Ready");
+        }
+      }
+
+      /* Groq request */
+      async function fetchJSON(url, init, timeoutMs) {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), timeoutMs);
+        try {
+          const r = await fetch(url, { ...init, signal: ctrl.signal });
+          const txt = await r.text();
+          let json = null;
+          try { json = JSON.parse(txt); } catch {}
+          if (!r.ok) {
+            const detail = json && (json.error && json.error.message) ? json.error.message : txt.slice(0, 220);
+            throw new Error(r.status + " " + r.statusText + " | " + detail);
+          }
+          return json;
+        } finally {
+          clearTimeout(t);
+        }
+      }
+
+      async function askAI(userText) {
+        const key = (state.key || "").trim();
+        if (!key) { setError("Missing Groq API key. Open Settings."); return; }
+        if (!modelSupportsVision(state.model)) { setError("Pick a Llama 4 vision model in Settings."); return; }
+
+        state.sentCommand = cleanForDisplay(userText);
+        state.commandDraft = "";
+        state.interim = "";
+        sttSegments = [];
+
+        setMode("thinking", "Capturing...");
+        state.visionOk = false;
+        renderHUD();
+
+        const ready = await waitForVideoReady();
+        if (!ready) { setError("Video not ready yet. Try again."); return; }
+
+        flash();
+        const imageDataUrl = captureVisionDataUrl();
+        state.visionOk = !!imageDataUrl;
+        state.snapAt = state.visionOk ? Date.now() : 0;
+
+        if (!imageDataUrl) { setError("Snapshot failed. Camera frame unavailable."); return; }
+
+        setMode("thinking", "Groq request...");
+        renderHUD();
+
+        const messages = [
+          { role: "system", content: state.systemPrompt || DEFAULT_SYS },
+          ...history,
+          {
+            role: "user",
+            content: [
+              { type: "text", text: state.sentCommand },
+              { type: "image_url", image_url: { url: imageDataUrl } }
+            ]
+          }
+        ];
+
+        try {
+          const res = await fetchJSON("https://api.groq.com/openai/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer " + key
+            },
+            body: JSON.stringify({
+              model: state.model,
+              messages,
+              temperature: 0.2,
+              max_completion_tokens: 500,
+              top_p: 1,
+              stream: false
+            })
+          }, 25000);
+
+          const msg =
+            res && res.choices && res.choices[0] && res.choices[0].message && res.choices[0].message.content
+              ? String(res.choices[0].message.content).trim()
+              : "";
+
+          state.answer = msg || "(empty)";
+          state.note = "Say: " + state.wakeWord;
+
+          pushHistory("user", state.sentCommand);
+          pushHistory("assistant", state.answer);
+
+          speak(state.answer);
+          renderHUD();
+        } catch (e) {
+          setError("Groq failed: " + (e && e.message ? e.message : e));
+        }
+      }
+
+      async function finalizeCommand(force) {
+        if (state.mode !== "listening") return;
+
+        if (listenHardTimer) { clearTimeout(listenHardTimer); listenHardTimer = null; }
+        if (silenceTimer) { clearTimeout(silenceTimer); silenceTimer = null; }
+
+        const cmd = cleanForDisplay((state.commandDraft + " " + state.interim).trim());
+        state.commandDraft = "";
+        state.interim = "";
+        sttSegments = [];
+
+        if (!cmd) { setMode("idle", "Say: " + state.wakeWord); return; }
+        if (!force) beep(740, 55, 0.04);
+
+        await askAI(cmd);
+      }
+
+      /* Settings UI */
+      const startBtn = document.getElementById("startBtn");
+      const micBtn = document.getElementById("micBtn");
+      const camBtn = document.getElementById("camBtn");
+      const mirrorBtn = document.getElementById("mirrorBtn");
+
+      const drawer = document.getElementById("drawer");
+      const setBtn = document.getElementById("setBtn");
+      const saveBtn = document.getElementById("saveBtn");
+      const closeBtn = document.getElementById("closeBtn");
+
+      const keyInput = document.getElementById("keyInput");
+      const wakeInput = document.getElementById("wakeInput");
+      const langSelect = document.getElementById("langSelect");
+      const modelInput = document.getElementById("modelInput");
+      const ttsSelect = document.getElementById("ttsSelect");
+      const sysInput = document.getElementById("sysInput");
+
+      function safeJson(s) { try { return JSON.parse(s); } catch { return null; } }
+
+      function loadSettings() {
+        const s = safeJson(localStorage.getItem("vrhud_settings")) || {};
+        state.key = s.key || "";
+        state.wakeWord = s.wakeWord || "computer";
+        state.lang = s.lang || "en-US";
+        state.tts = (s.tts ?? true) === true;
+        state.model = s.model || "meta-llama/llama-4-maverick-17b-128e-instruct";
+        state.systemPrompt = s.systemPrompt || DEFAULT_SYS;
+        state.ttsVoiceId = s.ttsVoiceId || "";
+
+        keyInput.value = state.key;
+        wakeInput.value = state.wakeWord;
+        langSelect.value = state.lang;
+        modelInput.value = state.model;
+        ttsSelect.value = state.tts ? "on" : "off";
+        sysInput.value = state.systemPrompt;
+
+        refreshVoices();
+      }
+
+      function saveSettings() {
+        state.key = keyInput.value.trim();
+        state.wakeWord = (wakeInput.value.trim() || "computer");
+        state.lang = langSelect.value;
+        state.model = (modelInput.value.trim() || "meta-llama/llama-4-maverick-17b-128e-instruct");
+        state.tts = (ttsSelect.value === "on");
+        state.systemPrompt = (sysInput.value || "").trim() || DEFAULT_SYS;
+        state.ttsVoiceId = (voiceSelect && voiceSelect.value) ? voiceSelect.value : "";
+
+        localStorage.setItem("vrhud_settings", JSON.stringify({
+          key: state.key,
+          wakeWord: state.wakeWord,
+          lang: state.lang,
+          tts: state.tts,
+          model: state.model,
+          systemPrompt: state.systemPrompt,
+          ttsVoiceId: state.ttsVoiceId
+        }));
+
+        if (rec) rec.lang = state.lang;
+        setMode("idle", "Say: " + state.wakeWord);
+      }
+
+      setBtn.onclick = () => {
+        loadSettings();
+        warmupVoices();
+        drawer.classList.add("on");
+      };
+      closeBtn.onclick = () => drawer.classList.remove("on");
+      saveBtn.onclick = () => { saveSettings(); drawer.classList.remove("on"); };
+
+      mirrorBtn.onclick = () => { mirrored = !mirrored; applyMirror(); };
+
+      camBtn.onclick = async () => {
+        facingMode = (facingMode === "environment") ? "user" : "environment";
+        camBtn.textContent = (facingMode === "environment") ? "Rear Cam" : "Front Cam";
+        await startCamera();
+      };
+
+      micBtn.onclick = () => {
+        state.micOn = !state.micOn;
+        micBtn.textContent = state.micOn ? "Mic On" : "Mic Off";
+
+        if (!state.micOn) {
+          stopSTT();
+          setMode("idle", "Mic off");
+          return;
+        }
+
+        setMode("idle", "Say: " + state.wakeWord);
+        startSTT();
+      };
+
+      async function enterFullscreen() {
+        try { await document.documentElement.requestFullscreen?.(); } catch {}
+      }
+
+      startBtn.onclick = async () => {
+        await enterFullscreen();
+        applyMirror();
+        loadSettings();
+        saveSettings();
+        initTTS();
+        await startCamera();
+
+        if (state.micOn) startSTT();
+        setMode("idle", "Say: " + state.wakeWord);
+      };
+
+      document.body.addEventListener("dblclick", enterFullscreen);
+
+      applyMirror();
+      loadSettings();
+      initTTS();
+      renderHUD();
+    </script>
+  </body>
+</html>
+
