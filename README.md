@@ -10,6 +10,8 @@ Open, hackable mixed reality assistants
 
 Reality Machine - as the type of hackable mixed reality machines that can render holograms, interact with AI assistants and all the other cool stuff on it.
 
+## Hyperreality for everyone.
+
 ---
 
 # VR Passthrough HUD + Voice + Vision
