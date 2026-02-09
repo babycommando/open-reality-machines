@@ -58,3 +58,18 @@ To build a reality machine is to build a new way to interact with reality at you
 Reality machines are our answer to that. A piece of technology and ideology that bends the actual reality with digital elements, an enhanced experienced curated and manufactured by yourself, fully DIY.
 
 "You are not a gadget." - Jaron Lanier, father of virtual reality.
+
+
+---
+
+To dos:
+
+- [ ] Open Online Hyperrealities - Make a peer to peer or matrix-like network for other people to geographically see each other and their digital creations (imagine navigating the world and seeing holograms of other people, or interacting with other digital beings or AIs) - Something like a world scale videogame map.
+- [ ] Render three dimensional objects on the screen (holograms)
+- [ ] Enhance safety protocols
+- [ ] Three dimensional scan and space recognition
+- [ ] Enable controllers support - from simple gamepads to advanced neural bands
+- [ ] Enhance AI assistant voice over voice for natural conversations
+- [ ] Add generative diffusion for two and three dimensional objects on demand
+- [ ] Increase battery life efficiency
+- [ ] more
