@@ -12,7 +12,7 @@ Reality Machine - as the type of hackable mixed reality machines that can render
 
 ---
 
-# VR Passthrough HUD + Voice + Vision + Groq
+# VR Passthrough HUD + Voice + Vision
 
 This is a single file browser VR style passthrough HUD:
 - splits the screen into 2 eyes
@@ -22,6 +22,7 @@ This is a single file browser VR style passthrough HUD:
 - captures a snapshot from the camera
 - sends text + image to Groq (OpenAI compatible endpoint)
 - speaks the answer back using browser TTS
+- modify HUD interface if necessary
 
 ## Files
 - put this whole HTML into `index.html`
