@@ -8,13 +8,41 @@
 # Reality Machines
 Open, hackable mixed reality assistants
 
----
-
 Reality Machine - as the type of hackable mixed reality machines that can render holograms, interact with AI assistants and all the other cool stuff on it.
 
 ---
 
-The Reality Machines Manifesto
+# VR Passthrough HUD + Voice + Vision + Groq
+
+This is a single file browser VR style passthrough HUD:
+- splits the screen into 2 eyes
+- shows the live camera feed behind a HUD
+- listens for a wake word
+- records your command
+- captures a snapshot from the camera
+- sends text + image to Groq (OpenAI compatible endpoint)
+- speaks the answer back using browser TTS
+
+## Files
+- put this whole HTML into `index.html`
+
+## Run it
+Option A: any static server (recommended)
+- Node:
+  - `npx serve .`
+  - open the printed URL on your phone
+
+- Python:
+  - `python -m http.server 8000`
+  - open `http://YOUR_LAN_IP:8000` on your phone
+
+Option B: plain file open
+- you can open `index.html` directly, but some mobile browsers get weird with camera permissions, so prefer a server
+
+
+---
+
+# The Reality Machines Manifesto
 
 A world without open and hackable augmented reality machines can have catastrophic consequences, as corporates could one day own your reality, and change the way you see the world at their will, for profit.
 
