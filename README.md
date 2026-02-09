@@ -22,13 +22,12 @@ This is a single file browser VR style passthrough HUD:
 - captures a snapshot from the camera
 - sends text + image to Groq (OpenAI compatible endpoint)
 - speaks the answer back using browser TTS
-- modify HUD interface if necessary
-
-## Files
-- put this whole HTML into `index.html`
+- update HUD ui accordingly
 
 ## Run it
-Option A: any static server (recommended)
+- Save the index.html file (yes, its all there)
+
+Serving Option A: any static server (recommended)
 - Node:
   - `npx serve .`
   - open the printed URL on your phone
@@ -37,9 +36,10 @@ Option A: any static server (recommended)
   - `python -m http.server 8000`
   - open `http://YOUR_LAN_IP:8000` on your phone
 
-Option B: plain file open
+Serving Option B: plain file open
 - you can open `index.html` directly, but some mobile browsers get weird with camera permissions, so prefer a server
 
+You can run this on your computer, and then access the open ports on the same network form your phone, or run on your phone directly on something like termux/proot-distro, running it locally and going to localhost. 
 
 ---
 
